@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BizPulse — Every Business, One Pulse</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ======= LOGIN SCREEN ======= -->
+<div id="login-screen" class="login-screen">
+  <div class="login-bg-art">
+    <div class="bg-circle c1"></div>
+    <div class="bg-circle c2"></div>
+    <div class="bg-circle c3"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-icon">⚡</span>
+      <div>
+        <h1 class="logo-name">BizPulse</h1>
+        <p class="logo-tag">Every business, one pulse.</p>
+      </div>
+    </div>
+    <div id="login-error" class="alert alert-danger" style="display:none"></div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username"/>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password"/>
+    </div>
+    <button class="btn-primary" onclick="handleLogin()">Sign In →</button>
+    <p class="login-footer">Need access? Contact your administrator.</p>
+  </div>
+</div>
+
+<!-- ======= MAIN APP ======= -->
+<div id="app" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-icon-sm">⚡</span>
+      <span class="sidebar-brand">BizPulse</span>
+      <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="#" class="nav-item active" data-page="dashboard" onclick="navigate('dashboard',this)">
+        <span class="nav-icon">▦</span> Master Dashboard
+      </a>
+
+      <div class="nav-section-label">Businesses</div>
+      <div id="business-nav-items"></div>
+
+      <a href="#" class="nav-item nav-add" onclick="showAddBusinessModal()">
+        <span class="nav-icon">＋</span> Add Business
+      </a>
+
+      <div class="nav-section-label">Tools</div>
+      <a href="#" class="nav-item" data-page="reports" onclick="navigate('reports',this)">
+        <span class="nav-icon">📊</span> Reports
+      </a>
+      <a href="#" class="nav-item" data-page="settings" onclick="navigate('settings',this)">
+        <span class="nav-icon">⚙</span> Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar" id="user-avatar-sidebar">BP</div>
+        <div>
+          <p id="sidebar-username" class="user-name">User</p>
+          <p id="sidebar-plan" class="user-plan">Trial</p>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="handleLogout()">Log out</button>
+    </div>
+  </aside>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="topbar-menu-btn" onclick="toggleSidebar()">☰</button>
+    <div class="topbar-title" id="topbar-title">Master Dashboard</div>
+    <div class="topbar-right">
+      <div class="trial-badge" id="trial-badge" style="display:none">
+        <span id="trial-days-text">30 days left</span>
+      </div>
+      <div class="user-avatar-top" id="user-avatar-top">BP</div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="main-content">
+
+    <!-- MASTER DASHBOARD PAGE -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h2>Master Dashboard</h2>
+        <p class="page-subtitle">All your businesses at a glance</p>
+      </div>
+      <div class="kpi-grid" id="master-kpis"></div>
+      <div class="charts-row">
+        <div class="chart-card full-width">
+          <div class="chart-card-header">
+            <h3>Revenue by Business</h3>
+            <select id="revenue-period" onchange="loadMasterCharts()">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
+          <canvas id="chart-revenue-comparison" height="90"></canvas>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Peak Profit Periods</h3></div>
+          <canvas id="chart-peak-periods" height="160"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>Resource Allocation Signal</h3></div>
+          <canvas id="chart-allocation" height="160"></canvas>
+        </div>
+      </div>
+      <div class="insights-panel" id="insights-panel">
+        <h3>📡 Insights</h3>
+        <div id="insights-list"></div>
+      </div>
+    </div>
+
+    <!-- BUSINESS PAGE (dynamic) -->
+    <div id="page-business" class="page">
+      <div class="page-header">
+        <div class="page-header-row">
+          <div>
+            <h2 id="biz-page-name">Business Name</h2>
+            <p class="page-subtitle" id="biz-page-type">Type</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-secondary" onclick="showAddSaleModal()">+ Record Sale</button>
+            <button class="btn-secondary" onclick="showAddExpenseModal()">+ Add Expense</button>
+            <button class="btn-primary" onclick="showAddStockModal()">+ Update Stock</button>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-grid" id="biz-kpis"></div>
+      <div class="charts-row">
+        <div class="chart-card full-width">
+          <div class="chart-card-header">
+            <h3>Sales Trend</h3>
+            <select id="biz-period" onchange="loadBusinessCharts()">
+              <option value="7">7 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </div>
+          <canvas id="chart-biz-sales" height="90"></canvas>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h3>Inventory Status</h3><button class="btn-sm" onclick="showAddStockModal()">Update</button></div>
+          <div id="inventory-list" class="inventory-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Recent Transactions</h3></div>
+          <div id="transactions-list" class="transactions-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORTS PAGE -->
+    <div id="page-reports" class="page">
+      <div class="page-header">
+        <h2>Reports</h2>
+        <p class="page-subtitle">Generate and export business reports</p>
+      </div>
+      <div class="reports-grid">
+        <div class="report-card" onclick="generateReport('summary')">
+          <div class="report-icon">📋</div>
+          <h3>Business Summary</h3>
+          <p>All businesses — revenue, expenses, profit</p>
+          <span class="report-badge">PDF</span>
+        </div>
+        <div class="report-card" onclick="generateReport('inventory')">
+          <div class="report-icon">📦</div>
+          <h3>Inventory Report</h3>
+          <p>Current stock levels and low-stock alerts</p>
+          <span class="report-badge">PDF</span>
+        </div>
+        <div class="report-card" onclick="generateReport('profit')">
+          <div class="report-icon">📈</div>
+          <h3>Profit & Loss</h3>
+          <p>P&L statement per business</p>
+          <span class="report-badge">PDF</span>
+        </div>
+        <div class="report-card" onclick="generateReport('peak')">
+          <div class="report-icon">🏆</div>
+          <h3>Peak Periods</h3>
+          <p>Best-performing days and months</p>
+          <span class="report-badge">PDF</span>
+        </div>
+      </div>
+      <div class="report-filter">
+        <h3>Custom Report</h3>
+        <div class="filter-row">
+          <div class="form-group">
+            <label>Business</label>
+            <select id="report-biz-select"><option value="all">All Businesses</option></select>
+          </div>
+          <div class="form-group">
+            <label>From</label>
+            <input type="date" id="report-from"/>
+          </div>
+          <div class="form-group">
+            <label>To</label>
+            <input type="date" id="report-to"/>
+          </div>
+          <button class="btn-primary" onclick="generateCustomReport()">Generate →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <h2>Settings</h2>
+        <p class="page-subtitle">Manage your account and preferences</p>
+      </div>
+      <div class="settings-grid">
+        <div class="card">
+          <h3>Account</h3>
+          <div class="settings-row"><span>Username</span><strong id="s-username">—</strong></div>
+          <div class="settings-row"><span>Plan</span><strong id="s-plan">—</strong></div>
+          <div class="settings-row"><span>Trial expires</span><strong id="s-expiry">—</strong></div>
+          <div class="settings-row"><span>Email</span><strong id="s-email">—</strong></div>
+        </div>
+        <div class="card">
+          <h3>Notifications</h3>
+          <div class="settings-row"><span>Trial expiry alerts</span><input type="checkbox" checked id="notif-trial"/></div>
+          <div class="settings-row"><span>Low stock alerts</span><input type="checkbox" checked id="notif-stock"/></div>
+          <div class="settings-row"><span>Daily summary email</span><input type="checkbox" id="notif-daily"/></div>
+          <button class="btn-primary" style="margin-top:1rem" onclick="saveSettings()">Save Settings</button>
+        </div>
+        <div class="card">
+          <h3>Subscription</h3>
+          <p style="color:var(--muted);font-size:14px;margin-bottom:1rem">Upgrade to a full subscription to unlock unlimited access, advanced reports, and priority support.</p>
+          <button class="btn-upgrade" onclick="showUpgradeModal()">🚀 Upgrade Now</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ======= MODALS ======= -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+
+  <!-- Add Business -->
+  <div id="modal-add-business" class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h3>Add New Business</h3><button onclick="closeAllModals()">✕</button></div>
+    <div class="form-group"><label>Business Name</label><input type="text" id="nb-name" placeholder="e.g. Golden Bakery"/></div>
+    <div class="form-group"><label>Business Type</label>
+      <select id="nb-type">
+        <option value="bakery">Bakery</option>
+        <option value="water_factory">Pure Water Factory</option>
+        <option value="fastfood">Fast Food</option>
+        <option value="printing">Printing Company</option>
+        <option value="retail">Retail Store</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Description (optional)</label><input type="text" id="nb-desc" placeholder="Brief description"/></div>
+    <div class="form-group"><label>Currency Symbol</label><input type="text" id="nb-currency" value="₦" maxlength="3"/></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+      <button class="btn-primary" onclick="addBusiness()">Create Business →</button>
+    </div>
+  </div>
+
+  <!-- Record Sale -->
+  <div id="modal-add-sale" class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h3>Record Sale</h3><button onclick="closeAllModals()">✕</button></div>
+    <div class="form-group"><label>Product / Item</label><input type="text" id="sale-item" placeholder="e.g. Bread loaf"/></div>
+    <div class="form-group"><label>Quantity</label><input type="number" id="sale-qty" value="1" min="1"/></div>
+    <div class="form-group"><label>Unit Price (₦)</label><input type="number" id="sale-price" placeholder="0.00"/></div>
+    <div class="form-group"><label>Date</label><input type="date" id="sale-date"/></div>
+    <div class="form-group"><label>Notes (optional)</label><input type="text" id="sale-notes" placeholder="Any note..."/></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+      <button class="btn-primary" onclick="recordSale()">Save Sale →</button>
+    </div>
+  </div>
+
+  <!-- Add Expense -->
+  <div id="modal-add-expense" class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h3>Add Expense</h3><button onclick="closeAllModals()">✕</button></div>
+    <div class="form-group"><label>Category</label>
+      <select id="exp-category">
+        <option value="raw_materials">Raw Materials</option>
+        <option value="utilities">Utilities</option>
+        <option value="salaries">Salaries</option>
+        <option value="equipment">Equipment</option>
+        <option value="transport">Transport</option>
+        <option value="rent">Rent</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Description</label><input type="text" id="exp-desc" placeholder="e.g. Flour purchase 50kg"/></div>
+    <div class="form-group"><label>Amount (₦)</label><input type="number" id="exp-amount" placeholder="0.00"/></div>
+    <div class="form-group"><label>Date</label><input type="date" id="exp-date"/></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+      <button class="btn-primary" onclick="recordExpense()">Save Expense →</button>
+    </div>
+  </div>
+
+  <!-- Update Stock -->
+  <div id="modal-add-stock" class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h3>Update Stock / Inventory</h3><button onclick="closeAllModals()">✕</button></div>
+    <div class="form-group"><label>Item Name</label><input type="text" id="stock-item" placeholder="e.g. Flour (50kg bags)"/></div>
+    <div class="form-group"><label>Quantity in Stock</label><input type="number" id="stock-qty" value="0" min="0"/></div>
+    <div class="form-group"><label>Unit</label><input type="text" id="stock-unit" placeholder="bags, litres, packs..."/></div>
+    <div class="form-group"><label>Reorder Level (alert when below)</label><input type="number" id="stock-reorder" value="5" min="0"/></div>
+    <div class="form-group"><label>Unit Cost (₦)</label><input type="number" id="stock-cost" placeholder="0.00"/></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+      <button class="btn-primary" onclick="updateStock()">Save →</button>
+    </div>
+  </div>
+
+  <!-- Trial Expiry Warning -->
+  <div id="modal-trial-warning" class="modal modal-warning" onclick="event.stopPropagation()">
+    <div class="modal-warning-icon">⏰</div>
+    <h3 id="trial-warning-title">Trial Ending Soon!</h3>
+    <p id="trial-warning-msg">Your trial expires in <strong id="trial-warning-days">7</strong> days. Upgrade now to keep access to all your business data.</p>
+    <div class="modal-footer modal-footer-center">
+      <button class="btn-secondary" onclick="closeAllModals()">Remind me later</button>
+      <button class="btn-upgrade" onclick="showUpgradeModal()">Upgrade Now 🚀</button>
+    </div>
+  </div>
+
+  <!-- Upgrade Modal -->
+  <div id="modal-upgrade" class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h3>Upgrade BizPulse</h3><button onclick="closeAllModals()">✕</button></div>
+    <div class="upgrade-plans">
+      <div class="plan-card">
+        <div class="plan-name">Monthly</div>
+        <div class="plan-price">₦5,000<span>/mo</span></div>
+        <ul class="plan-features">
+          <li>✓ All businesses</li>
+          <li>✓ Full reports</li>
+          <li>✓ Inventory alerts</li>
+          <li>✓ Email support</li>
+        </ul>
+        <button class="btn-primary" onclick="alert('Contact admin to activate.')">Choose Monthly</button>
+      </div>
+      <div class="plan-card plan-popular">
+        <div class="plan-badge">Best Value</div>
+        <div class="plan-name">Yearly</div>
+        <div class="plan-price">₦45,000<span>/yr</span></div>
+        <ul class="plan-features">
+          <li>✓ Everything in Monthly</li>
+          <li>✓ Priority SMS alerts</li>
+          <li>✓ Advanced insights</li>
+          <li>✓ Save ₦15,000</li>
+        </ul>
+        <button class="btn-upgrade" onclick="alert('Contact admin to activate.')">Choose Yearly 🚀</button>
+      </div>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:1rem">Contact admin or WhatsApp us to complete payment.</p>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
